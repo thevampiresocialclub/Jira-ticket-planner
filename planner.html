@@ -217,6 +217,7 @@
     display: flex;
     justify-content: space-between;
     align-items: baseline;
+    gap: 6px;
     padding: 4px 6px;
     border-bottom: var(--hairline) solid var(--border);
     background: var(--surface-muted);
@@ -1918,7 +1919,7 @@ async function writeLinkedFile() {
 function scheduleLinkedFileWrite() {
   if (!linkedFileHandle) return;
   clearTimeout(fileWriteTimer);
-  fileWriteTimer = setTimeout(() => writeLinkedFile(), 500);
+  fileWriteTimer = setTimeout(() => writeLinkedFile(), 1500);
 }
 
 function updateLinkUi() {
