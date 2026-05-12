@@ -139,6 +139,24 @@
   button.primary:hover {
     filter: brightness(1.08);
   }
+  button.linked {
+    border-color: var(--accent);
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+  button.linked.warn {
+    border-color: var(--alert);
+    color: var(--alert);
+  }
+  button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  button:disabled:hover {
+    background: transparent;
+    border-color: var(--border);
+  }
   button.icon {
     padding: 4px 6px;
     border: none;
@@ -616,6 +634,142 @@
     text-overflow: clip;
   }
 
+  /* MODAL */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(14, 26, 36, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 500;
+    backdrop-filter: blur(2px);
+  }
+  .modal-backdrop.hidden { display: none; }
+
+  .modal {
+    --modal-color: var(--peacock);
+    background: var(--surface);
+    border-radius: 8px;
+    width: 440px;
+    max-width: 92vw;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+    border: var(--hairline) solid var(--border-strong);
+  }
+  .modal-stripe {
+    height: 6px;
+    background: var(--modal-color);
+    flex-shrink: 0;
+  }
+  .modal-head {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: var(--hairline) solid var(--border);
+    background: var(--surface);
+  }
+  .modal-head h3 {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-soft);
+    flex: 1;
+  }
+  .modal-close {
+    background: transparent;
+    border: none;
+    color: var(--text-faint);
+    cursor: pointer;
+    font-size: 20px;
+    padding: 0 8px;
+    line-height: 1;
+    border-radius: 4px;
+  }
+  .modal-close:hover { color: var(--text); background: var(--surface-muted); }
+
+  .modal-body {
+    padding: 14px 16px 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+  }
+  .modal-body label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .modal-body label > span:first-child {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-soft);
+    font-weight: 700;
+  }
+  .modal-body input[type="text"] {
+    background: var(--surface-muted);
+    border: var(--hairline) solid var(--border);
+    border-radius: var(--radius);
+    padding: 7px 10px;
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 13px;
+  }
+  .modal-body input[type="text"]:focus {
+    outline: none;
+    border-color: var(--accent);
+    background: var(--surface);
+  }
+  .modal-body input#editKey,
+  .modal-body input#editHours {
+    font-family: var(--font-mono);
+    font-weight: 600;
+  }
+  .modal-check {
+    flex-direction: row !important;
+    align-items: center;
+    gap: 8px !important;
+    margin-top: 4px;
+    padding: 6px 0;
+  }
+  .modal-check input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent);
+    margin: 0;
+  }
+  .modal-check span {
+    font-size: 12px !important;
+    text-transform: none !important;
+    letter-spacing: 0 !important;
+    color: var(--text) !important;
+    font-weight: 500 !important;
+  }
+
+  .modal-foot {
+    padding: 12px 16px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    border-top: var(--hairline) solid var(--border);
+    background: var(--surface-muted);
+  }
+  .modal-foot-spacer { flex: 1; }
+  .modal-danger {
+    color: var(--alert);
+    border-color: var(--border);
+  }
+  .modal-danger:hover {
+    background: var(--alert);
+    color: #FFFFFF;
+    border-color: var(--alert);
+  }
+
   /* CONTEXT MENU */
   .context-menu {
     position: fixed;
@@ -719,6 +873,7 @@
       <button id="btnExport" title="Export JSON backup">Export</button>
       <input type="file" id="jsonInput" accept=".json" class="hidden">
       <button id="btnImportJson" title="Restore from JSON backup">Restore</button>
+      <button id="btnLink" title="Auto-save to a JSON file on disk (Chrome/Edge)">Link File…</button>
       <button id="btnTheme" title="Toggle theme">Dark</button>
     </div>
   </header>
@@ -753,9 +908,52 @@
   <div class="nag" id="nag"></div>
   <div class="toast" id="toast"></div>
   <div class="context-menu hidden" id="contextMenu">
+    <button data-action="edit">Edit…</button>
     <button data-action="clone">Clone</button>
     <button data-action="toggle-done">Mark Done</button>
     <button data-action="delete">Delete</button>
+  </div>
+
+  <div class="modal-backdrop hidden" id="modalBackdrop">
+    <div class="modal" role="dialog" aria-labelledby="modalTitle">
+      <div class="modal-stripe"></div>
+      <div class="modal-head">
+        <h3 id="modalTitle">Edit block</h3>
+        <button class="modal-close" id="modalClose" title="Close">×</button>
+      </div>
+      <div class="modal-body">
+        <label>
+          <span>Jira Key</span>
+          <input id="editKey" type="text" spellcheck="false" autocomplete="off" placeholder="PROJ-123">
+        </label>
+        <label>
+          <span>Name</span>
+          <input id="editName" type="text" spellcheck="false" placeholder="Ticket name">
+        </label>
+        <label>
+          <span>Sub-task</span>
+          <input id="editSubname" type="text" spellcheck="false" placeholder="Optional sub-task">
+        </label>
+        <label>
+          <span>Hours</span>
+          <input id="editHours" type="text" spellcheck="false" placeholder="8h, 1.5h, 1d 4h">
+        </label>
+        <label>
+          <span>Note</span>
+          <input id="editNote" type="text" maxlength="60" spellcheck="false" placeholder="Short description">
+        </label>
+        <label class="modal-check">
+          <input id="editDone" type="checkbox">
+          <span>Mark this block as done</span>
+        </label>
+      </div>
+      <div class="modal-foot">
+        <button id="modalDelete" class="modal-danger" title="Delete this block">Delete</button>
+        <div class="modal-foot-spacer"></div>
+        <button id="modalCancel">Cancel</button>
+        <button id="modalSave" class="primary">Save</button>
+      </div>
+    </div>
   </div>
 
 <script>
@@ -802,6 +1000,7 @@ function save() {
     console.error('save failed', e);
     toast('Save failed: storage full?', true);
   }
+  scheduleLinkedFileWrite();
   updateNag();
 }
 
@@ -821,6 +1020,8 @@ function load() {
 
 function seedIfFresh() {
   if (state.seeded) return;
+  const t0 = Date.now();
+  let i = 0;
   for (const s of SEED_BLOCKS) {
     state.blocks.push({
       id: uid(),
@@ -832,6 +1033,7 @@ function seedIfFresh() {
       done: false,
       date: null,
       stale: false,
+      order: t0 + i++,
     });
   }
   state.seeded = true;
@@ -973,7 +1175,9 @@ function renderWeeks() {
       const key = dateKey(d);
       const isToday = key === today;
       const isWeekend = i >= 5;
-      const dayBlocks = state.blocks.filter(b => b.date === key);
+      const dayBlocks = state.blocks
+        .filter(b => b.date === key)
+        .sort((a, b) => (a.order || 0) - (b.order || 0));
       const hours = dayHours(key);
       const overflow = hours > DAY_CAP;
 
@@ -1005,7 +1209,9 @@ function renderWeeks() {
 function renderBacklog() {
   const list = document.getElementById('backlogList');
   list.innerHTML = '';
-  const items = state.blocks.filter(b => !b.date);
+  const items = state.blocks
+    .filter(b => !b.date)
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
   document.getElementById('backlogCount').textContent = items.length;
   if (items.length === 0) {
     list.innerHTML = `<div class="backlog-empty">Drop blocks here, or import a Jira CSV to populate.</div>`;
@@ -1071,6 +1277,12 @@ function renderSearchResult(b) {
     showContextMenu(b.id, e.clientX, e.clientY);
   });
 
+  el.addEventListener('dblclick', (e) => {
+    if (e.target.classList.contains('search-location')) return;
+    e.preventDefault();
+    openEditor(b.id);
+  });
+
   if (b.date) {
     el.querySelector('.search-location').addEventListener('click', (e) => {
       e.stopPropagation();
@@ -1120,43 +1332,30 @@ function renderBlock(b) {
   el.draggable = true;
   el.style.setProperty('--block-color', colorForKey(b.jiraKey));
 
+  const nameEmpty = !b.name;
+  const noteEmpty = !b.note;
+
   el.innerHTML = `
     <div class="block-header">
       <span class="block-key mono">${escapeHtml(b.jiraKey || '—')}</span>
-      <input class="block-name" value="${escapeAttr(b.name || '')}" placeholder="ticket name" spellcheck="false">
+      <span class="block-name-display ${nameEmpty ? 'empty' : ''}">${escapeHtml(b.name || '(untitled)')}</span>
     </div>
     <div class="block-body">
-      <input class="block-hours mono" value="${formatHours(b.hours)}" title="Hours" spellcheck="false">
+      <span class="block-hours-display mono">${escapeHtml(formatHours(b.hours))}</span>
       <span class="block-dash">—</span>
-      <input class="block-note" value="${escapeAttr(b.note || '')}" placeholder="short descriptive words" spellcheck="false" maxlength="60">
+      <span class="block-note-display ${noteEmpty ? 'empty' : ''}">${escapeHtml(b.note || '(no description)')}</span>
     </div>
   `;
 
-  // Wire up handlers
-  el.querySelector('.block-hours').addEventListener('change', (e) => {
-    b.hours = parseHours(e.target.value);
-    e.target.value = formatHours(b.hours);
-    save();
-    refreshDayHours(b.date);
-  });
-  el.querySelector('.block-hours').addEventListener('blur', (e) => {
-    e.target.value = formatHours(b.hours);
-  });
-
-  el.querySelector('.block-name').addEventListener('input', (e) => {
-    b.name = e.target.value;
-    save();
-  });
-  el.querySelector('.block-note').addEventListener('input', (e) => {
-    b.note = e.target.value;
-    save();
-  });
-
   el.addEventListener('contextmenu', (e) => {
-    if (e.target.matches('input, textarea')) return;
     e.preventDefault();
     e.stopPropagation();
     showContextMenu(b.id, e.clientX, e.clientY);
+  });
+
+  el.addEventListener('dblclick', (e) => {
+    e.preventDefault();
+    openEditor(b.id);
   });
 
   // Drag handlers
@@ -1167,12 +1366,6 @@ function renderBlock(b) {
   });
   el.addEventListener('dragend', () => {
     el.classList.remove('dragging');
-  });
-
-  // Prevent drag when interacting with form elements
-  el.querySelectorAll('input, button').forEach(input => {
-    input.addEventListener('mousedown', (e) => e.stopPropagation());
-    input.addEventListener('dragstart', (e) => e.preventDefault());
   });
 
   return el;
@@ -1237,6 +1430,7 @@ function moveBlock(id, date) {
   if (!b) return;
   if (b.date === date) return;
   b.date = date;
+  b.order = Date.now();
   save();
   render();
 }
@@ -1255,6 +1449,7 @@ function addBlock(date) {
     note: '',
     done: false,
     date: date || null,
+    order: Date.now(),
   };
   state.blocks.push(b);
   save();
@@ -1267,8 +1462,9 @@ function cloneBlock(id) {
   const copy = Object.assign({}, orig, {
     id: uid(),
     done: false,
+    order: Date.now(),
   });
-  // Insert right after original
+  // Insert right after original in state.blocks (visual position is dictated by `order`)
   const idx = state.blocks.indexOf(orig);
   state.blocks.splice(idx + 1, 0, copy);
   save();
@@ -1296,6 +1492,7 @@ function toggleDone(id) {
 let ctxBlockId = null;
 let activeTab = 'backlog';
 let searchQuery = '';
+let editingBlockId = null;
 
 function showContextMenu(blockId, x, y) {
   const menu = document.getElementById('contextMenu');
@@ -1320,6 +1517,54 @@ function showContextMenu(blockId, x, y) {
 function hideContextMenu() {
   document.getElementById('contextMenu').classList.add('hidden');
   ctxBlockId = null;
+}
+
+// ============================================================================
+// EDIT MODAL
+// ============================================================================
+
+function openEditor(blockId) {
+  const b = state.blocks.find(x => x.id === blockId);
+  if (!b) return;
+  editingBlockId = blockId;
+  document.getElementById('editKey').value = b.jiraKey || '';
+  document.getElementById('editName').value = b.name || '';
+  document.getElementById('editSubname').value = b.subname || '';
+  document.getElementById('editHours').value = formatHours(b.hours);
+  document.getElementById('editNote').value = b.note || '';
+  document.getElementById('editDone').checked = !!b.done;
+  const modalEl = document.querySelector('.modal');
+  modalEl.style.setProperty('--modal-color', colorForKey(b.jiraKey));
+  document.getElementById('modalBackdrop').classList.remove('hidden');
+  setTimeout(() => {
+    const nameInput = document.getElementById('editName');
+    nameInput.focus();
+    nameInput.select();
+  }, 0);
+}
+
+function closeEditor() {
+  document.getElementById('modalBackdrop').classList.add('hidden');
+  editingBlockId = null;
+}
+
+function saveEditor() {
+  if (!editingBlockId) return;
+  const b = state.blocks.find(x => x.id === editingBlockId);
+  if (!b) return;
+  b.jiraKey = document.getElementById('editKey').value.trim();
+  b.name = document.getElementById('editName').value.trim();
+  b.subname = document.getElementById('editSubname').value.trim();
+  b.hours = parseHours(document.getElementById('editHours').value);
+  b.note = document.getElementById('editNote').value.trim();
+  b.done = document.getElementById('editDone').checked;
+  save();
+  render();
+  closeEditor();
+}
+
+function isModalOpen() {
+  return !document.getElementById('modalBackdrop').classList.contains('hidden');
 }
 
 // ============================================================================
@@ -1412,6 +1657,7 @@ function importCsv(text) {
         done: false,
         date: null,
         stale: false,
+        order: Date.now() + added,
       });
       added++;
     }
@@ -1468,6 +1714,220 @@ function importJson(text) {
   } catch (e) {
     toast('Could not parse JSON', true);
   }
+}
+
+// ============================================================================
+// LINKED FILE (File System Access API) — Chrome/Edge only
+// ============================================================================
+
+const IDB_DB = 'plannerHandles';
+const IDB_STORE = 'handles';
+const IDB_KEY = 'linkedFile';
+
+let linkedFileHandle = null;
+let linkedFileNeedsPerm = false;
+let fileWriteTimer = null;
+let fileWriteInFlight = false;
+
+function fsaSupported() {
+  return typeof window.showSaveFilePicker === 'function';
+}
+
+function idbOpen() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_DB, 1);
+    req.onupgradeneeded = () => {
+      req.result.createObjectStore(IDB_STORE);
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function idbGet(key) {
+  const db = await idbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readonly');
+    const req = tx.objectStore(IDB_STORE).get(key);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function idbSet(key, val) {
+  const db = await idbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).put(val, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function idbDel(key) {
+  const db = await idbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).delete(key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function linkFile() {
+  if (!fsaSupported()) {
+    toast('File linking requires Chrome or Edge', true);
+    return;
+  }
+  try {
+    const handle = await window.showSaveFilePicker({
+      suggestedName: 'planner.json',
+      types: [{
+        description: 'Planner JSON backup',
+        accept: { 'application/json': ['.json'] },
+      }],
+    });
+    linkedFileHandle = handle;
+    linkedFileNeedsPerm = false;
+    await idbSet(IDB_KEY, handle);
+    updateLinkUi();
+    await writeLinkedFile();
+    toast(`Linked to ${handle.name}`);
+  } catch (e) {
+    if (e.name !== 'AbortError') {
+      console.error('linkFile failed', e);
+      toast('Could not link file', true);
+    }
+  }
+}
+
+async function unlinkFile() {
+  linkedFileHandle = null;
+  linkedFileNeedsPerm = false;
+  await idbDel(IDB_KEY);
+  updateLinkUi();
+  toast('Unlinked');
+}
+
+async function restoreLinkedFile() {
+  if (!fsaSupported()) {
+    updateLinkUi();
+    return;
+  }
+  try {
+    const handle = await idbGet(IDB_KEY);
+    if (!handle) {
+      updateLinkUi();
+      return;
+    }
+    const perm = await handle.queryPermission({ mode: 'readwrite' });
+    linkedFileHandle = handle;
+    linkedFileNeedsPerm = perm !== 'granted';
+    updateLinkUi();
+  } catch (e) {
+    console.error('restoreLinkedFile failed', e);
+    updateLinkUi();
+  }
+}
+
+async function ensureFilePerm() {
+  if (!linkedFileHandle) return false;
+  let perm = await linkedFileHandle.queryPermission({ mode: 'readwrite' });
+  if (perm === 'granted') {
+    linkedFileNeedsPerm = false;
+    return true;
+  }
+  // requestPermission requires a user gesture; this is safe to call only from a click handler
+  perm = await linkedFileHandle.requestPermission({ mode: 'readwrite' });
+  if (perm === 'granted') {
+    linkedFileNeedsPerm = false;
+    updateLinkUi();
+    return true;
+  }
+  linkedFileNeedsPerm = true;
+  updateLinkUi();
+  return false;
+}
+
+async function writeLinkedFile() {
+  if (!linkedFileHandle || fileWriteInFlight) return;
+  // Don't try to request permission from a non-gesture context
+  const perm = await linkedFileHandle.queryPermission({ mode: 'readwrite' });
+  if (perm !== 'granted') {
+    linkedFileNeedsPerm = true;
+    updateLinkUi();
+    return;
+  }
+  fileWriteInFlight = true;
+  try {
+    const writable = await linkedFileHandle.createWritable();
+    await writable.write(JSON.stringify(state, null, 2));
+    await writable.close();
+    state.lastExport = Date.now();
+    // No save() here — would loop. Just update the nag.
+    updateNag();
+  } catch (e) {
+    console.error('writeLinkedFile failed', e);
+  } finally {
+    fileWriteInFlight = false;
+  }
+}
+
+function scheduleLinkedFileWrite() {
+  if (!linkedFileHandle) return;
+  clearTimeout(fileWriteTimer);
+  fileWriteTimer = setTimeout(() => writeLinkedFile(), 500);
+}
+
+function updateLinkUi() {
+  const btn = document.getElementById('btnLink');
+  if (!btn) return;
+  if (!fsaSupported()) {
+    btn.textContent = 'Link File (Chrome only)';
+    btn.disabled = true;
+    btn.title = 'Use Chrome or Edge to enable auto-save to a file';
+    btn.classList.remove('linked', 'warn');
+    return;
+  }
+  btn.disabled = false;
+  if (linkedFileHandle) {
+    if (linkedFileNeedsPerm) {
+      btn.textContent = `⚠ ${linkedFileHandle.name}`;
+      btn.title = 'Click to re-grant permission to write to this file';
+      btn.classList.add('linked', 'warn');
+    } else {
+      btn.textContent = `✓ ${linkedFileHandle.name}`;
+      btn.title = 'Auto-saving to this file. Click to change.';
+      btn.classList.add('linked');
+      btn.classList.remove('warn');
+    }
+  } else {
+    btn.textContent = 'Link File…';
+    btn.title = 'Auto-save to a JSON file on disk';
+    btn.classList.remove('linked', 'warn');
+  }
+}
+
+async function onLinkButtonClick() {
+  if (linkedFileHandle && linkedFileNeedsPerm) {
+    const ok = await ensureFilePerm();
+    if (ok) {
+      await writeLinkedFile();
+      toast(`Reconnected to ${linkedFileHandle.name}`);
+    }
+    return;
+  }
+  if (linkedFileHandle) {
+    const choice = prompt(
+      `Currently linked to: ${linkedFileHandle.name}\n\n` +
+      `Type "change" to pick a different file, "unlink" to stop auto-saving, or leave empty to cancel.`,
+      ''
+    );
+    if (choice === 'change') linkFile();
+    else if (choice === 'unlink') unlinkFile();
+    return;
+  }
+  linkFile();
 }
 
 function updateNag() {
@@ -1537,6 +1997,10 @@ function wire() {
     e.target.value = '';
   });
 
+  document.getElementById('btnLink').addEventListener('click', () => {
+    onLinkButtonClick();
+  });
+
   document.getElementById('btnTheme').addEventListener('click', () => {
     state.theme = state.theme === 'light' ? 'dark' : 'light';
     document.documentElement.dataset.theme = state.theme;
@@ -1582,7 +2046,8 @@ function wire() {
       const id = ctxBlockId;
       hideContextMenu();
       if (!id) return;
-      if (action === 'clone') cloneBlock(id);
+      if (action === 'edit') openEditor(id);
+      else if (action === 'clone') cloneBlock(id);
       else if (action === 'toggle-done') toggleDone(id);
       else if (action === 'delete') {
         const b = state.blocks.find(x => x.id === id);
@@ -1598,6 +2063,34 @@ function wire() {
   window.addEventListener('blur', () => hideContextMenu());
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') hideContextMenu();
+  });
+
+  // Modal wiring
+  document.getElementById('modalClose').addEventListener('click', closeEditor);
+  document.getElementById('modalCancel').addEventListener('click', closeEditor);
+  document.getElementById('modalSave').addEventListener('click', saveEditor);
+  document.getElementById('modalDelete').addEventListener('click', () => {
+    if (!editingBlockId) return;
+    const b = state.blocks.find(x => x.id === editingBlockId);
+    const label = b ? (b.name || b.jiraKey || 'block') : 'block';
+    if (confirm(`Delete "${label}"?`)) {
+      const id = editingBlockId;
+      closeEditor();
+      deleteBlock(id);
+    }
+  });
+  document.getElementById('modalBackdrop').addEventListener('click', (e) => {
+    if (e.target.id === 'modalBackdrop') closeEditor();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (!isModalOpen()) return;
+    if (e.key === 'Escape') {
+      e.stopPropagation();
+      closeEditor();
+    } else if (e.key === 'Enter' && e.target.matches('.modal input[type="text"]')) {
+      e.preventDefault();
+      saveEditor();
+    }
   });
 
   // Keyboard shortcuts
@@ -1621,6 +2114,7 @@ load();
 seedIfFresh();
 wire();
 render();
+restoreLinkedFile();
 </script>
 </body>
 </html>
