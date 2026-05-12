@@ -487,7 +487,6 @@
     border: var(--hairline) solid var(--border);
     border-radius: var(--radius);
     padding: 0;
-    cursor: grab;
     transition: box-shadow var(--transition), transform var(--transition), opacity var(--transition);
     box-shadow: var(--shadow-sm);
     position: relative;
@@ -538,7 +537,24 @@
     white-space: nowrap;
     text-transform: uppercase;
     text-shadow: 0 1px 0 rgba(0, 0, 0, 0.15);
+    cursor: grab;
+    user-select: none;
+    padding: 1px 3px;
+    margin: -1px -3px -1px 0;
+    border-radius: 3px;
+    transition: background var(--transition);
   }
+  .block-key:hover {
+    background: rgba(255, 255, 255, 0.18);
+  }
+  .block-key:active { cursor: grabbing; }
+  .block.dragging .block-key { cursor: grabbing; }
+  /* Search results don't drag */
+  .block.search-result .block-key {
+    cursor: default;
+    user-select: text;
+  }
+  .block.search-result .block-key:hover { background: transparent; }
 
   .block-name {
     font-family: var(--font-sans);
@@ -1001,6 +1017,9 @@ function save() {
     toast('Save failed: storage full?', true);
   }
   scheduleLinkedFileWrite();
+  // Refresh search panel since it's read-only spans (no focus to disturb).
+  // Calendar/backlog DOM aren't re-rendered so input focus is preserved.
+  if (activeTab === 'search') renderSearch();
   updateNag();
 }
 
@@ -1329,42 +1348,65 @@ function renderBlock(b) {
   if (b.done) el.classList.add('done');
   if (b.stale) el.classList.add('stale');
   el.dataset.id = b.id;
-  el.draggable = true;
   el.style.setProperty('--block-color', colorForKey(b.jiraKey));
-
-  const nameEmpty = !b.name;
-  const noteEmpty = !b.note;
 
   el.innerHTML = `
     <div class="block-header">
-      <span class="block-key mono">${escapeHtml(b.jiraKey || '—')}</span>
-      <span class="block-name-display ${nameEmpty ? 'empty' : ''}">${escapeHtml(b.name || '(untitled)')}</span>
+      <span class="block-key mono" title="Drag to move">${escapeHtml(b.jiraKey || '—')}</span>
+      <input class="block-name" value="${escapeAttr(b.name || '')}" placeholder="ticket name" spellcheck="false">
     </div>
     <div class="block-body">
-      <span class="block-hours-display mono">${escapeHtml(formatHours(b.hours))}</span>
+      <input class="block-hours mono" value="${formatHours(b.hours)}" title="Hours" spellcheck="false">
       <span class="block-dash">—</span>
-      <span class="block-note-display ${noteEmpty ? 'empty' : ''}">${escapeHtml(b.note || '(no description)')}</span>
+      <input class="block-note" value="${escapeAttr(b.note || '')}" placeholder="short descriptive words" spellcheck="false" maxlength="60">
     </div>
   `;
 
+  // Inline edit handlers
+  el.querySelector('.block-hours').addEventListener('change', (e) => {
+    b.hours = parseHours(e.target.value);
+    e.target.value = formatHours(b.hours);
+    save();
+    refreshDayHours(b.date);
+  });
+  el.querySelector('.block-hours').addEventListener('blur', (e) => {
+    e.target.value = formatHours(b.hours);
+  });
+  el.querySelector('.block-name').addEventListener('input', (e) => {
+    b.name = e.target.value;
+    save();
+  });
+  el.querySelector('.block-note').addEventListener('input', (e) => {
+    b.note = e.target.value;
+    save();
+  });
+
+  // Right-click → context menu (skip if user is in an input — show native menu instead)
   el.addEventListener('contextmenu', (e) => {
+    if (e.target.matches('input, textarea')) return;
     e.preventDefault();
     e.stopPropagation();
     showContextMenu(b.id, e.clientX, e.clientY);
   });
 
+  // Double-click block (but not on inputs) opens the modal editor
   el.addEventListener('dblclick', (e) => {
+    if (e.target.matches('input, textarea')) return;
     e.preventDefault();
     openEditor(b.id);
   });
 
-  // Drag handlers
-  el.addEventListener('dragstart', (e) => {
+  // Drag handle: only the ticket key initiates a drag. The rest of the block
+  // stays interactive (inputs are clickable/focusable without dragging).
+  const keyEl = el.querySelector('.block-key');
+  keyEl.draggable = true;
+  keyEl.addEventListener('dragstart', (e) => {
     el.classList.add('dragging');
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', b.id);
+    try { e.dataTransfer.setDragImage(el, 20, 10); } catch (_) {}
   });
-  el.addEventListener('dragend', () => {
+  keyEl.addEventListener('dragend', () => {
     el.classList.remove('dragging');
   });
 
