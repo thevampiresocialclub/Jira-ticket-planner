@@ -948,10 +948,6 @@
           <input id="editName" type="text" spellcheck="false" placeholder="Ticket name">
         </label>
         <label>
-          <span>Sub-task</span>
-          <input id="editSubname" type="text" spellcheck="false" placeholder="Optional sub-task">
-        </label>
-        <label>
           <span>Hours</span>
           <input id="editHours" type="text" spellcheck="false" placeholder="8h, 1.5h, 1d 4h">
         </label>
@@ -990,7 +986,7 @@ const PALETTE = [
 ];
 
 let state = {
-  blocks: [],            // {id, jiraKey, name, subname, hours, note, done, date}
+  blocks: [],            // {id, jiraKey, name, hours, note, done, date, order, stale}
   knownKeys: [],         // keys present in last CSV import
   weekOffset: 0,         // weeks offset from current week
   theme: 'light',
@@ -1034,6 +1030,10 @@ function load() {
   } catch (e) {
     console.error('load failed', e);
   }
+  // Migrate away the deprecated `subname` field
+  for (const b of state.blocks) {
+    if ('subname' in b) delete b.subname;
+  }
   document.documentElement.dataset.theme = state.theme;
   document.getElementById('btnTheme').textContent = state.theme === 'light' ? 'Dark' : 'Light';
 }
@@ -1047,7 +1047,6 @@ function seedIfFresh() {
       id: uid(),
       jiraKey: s.jiraKey,
       name: s.name,
-      subname: '',
       hours: s.hours,
       note: '',
       done: false,
@@ -1144,7 +1143,7 @@ function colorForKey(key) {
 
 function dayHours(date) {
   return state.blocks
-    .filter(b => b.date === date && !b.done)
+    .filter(b => b.date === date)
     .reduce((sum, b) => sum + (parseFloat(b.hours) || 0), 0);
 }
 
@@ -1487,7 +1486,6 @@ function addBlock(date) {
     id: uid(),
     jiraKey: '',
     name: '',
-    subname: '',
     hours: 4,
     note: '',
     done: false,
@@ -1572,7 +1570,6 @@ function openEditor(blockId) {
   editingBlockId = blockId;
   document.getElementById('editKey').value = b.jiraKey || '';
   document.getElementById('editName').value = b.name || '';
-  document.getElementById('editSubname').value = b.subname || '';
   document.getElementById('editHours').value = formatHours(b.hours);
   document.getElementById('editNote').value = b.note || '';
   document.getElementById('editDone').checked = !!b.done;
@@ -1597,7 +1594,6 @@ function saveEditor() {
   if (!b) return;
   b.jiraKey = document.getElementById('editKey').value.trim();
   b.name = document.getElementById('editName').value.trim();
-  b.subname = document.getElementById('editSubname').value.trim();
   b.hours = parseHours(document.getElementById('editHours').value);
   b.note = document.getElementById('editNote').value.trim();
   b.done = document.getElementById('editDone').checked;
@@ -1694,7 +1690,6 @@ function importCsv(text) {
         id: uid(),
         jiraKey: key,
         name: summary,
-        subname: '',
         hours: hours,
         note: '',
         done: false,
